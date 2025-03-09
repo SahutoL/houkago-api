@@ -1,13 +1,8 @@
 from flask import Flask, jsonify, request
-import cloudscraper
 from bs4 import BeautifulSoup
-import concurrent.futures
-import time
-import random
-import argon2
+import cloudscraper, random, time
 
 app = Flask(__name__)
-ph = argon2.PasswordHasher()
 
 def get_random_delay():
     return random.uniform(1, 3)
@@ -32,7 +27,7 @@ def get_random_referer():
     ]
     return random.choice(referers)
 
-def get_chapter_text(scraper, url, headers, nid, wasuu, retry_count=3):
+def get_chapter_text(scraper, url, headers, nid, wasuu, retry_count=5):
     for _ in range(retry_count):
         try:
             time.sleep(get_random_delay())
@@ -57,7 +52,7 @@ def get_chapter_text(scraper, url, headers, nid, wasuu, retry_count=3):
         except Exception as e:
             print(f"Error fetching {url}: {str(e)}. Retrying...")
             time.sleep(get_random_delay())
-    return ""
+    return None
 
 def get_novel_txt(nid):
     novel_url = f'https://syosetu.org/novel/{nid}/'
@@ -76,18 +71,14 @@ def get_novel_txt(nid):
         response = scraper.get(novel_url, headers=headers, cookies={'over18': 'off'})
         soup = BeautifulSoup(response.text, "html.parser")
         title = soup.find('div', class_='ss').find('span', attrs={'itemprop': 'name'}).text
-        chapter_count = len(soup.select('a[href^="./"]'))
-        txt_data = [None] * chapter_count
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            future_to_url = {executor.submit(get_chapter_text, scraper, f'{novel_url}{i+1}.html', headers, nid, i+1): i for i in range(chapter_count)}
-            for future in concurrent.futures.as_completed(future_to_url):
-                chapter_num = future_to_url[future]
-                try:
-                    chapter_text = future.result()
-                    txt_data[chapter_num] = chapter_text
-                except Exception as exc:
-                    print(f'Chapter {chapter_num} generated an exception: {exc}')
-        novel_text = '\n\n'.join(filter(None, txt_data))
+        chapter_urls = [f'{novel_url}{i+1}.html' for i in range(len(soup.select('a[href^="./"]')))]
+        novel_text = ""
+        for i, url in enumerate(chapter_urls):
+            chapter_text = get_chapter_text(scraper, url, headers, nid, i+1)
+            if chapter_text:
+                novel_text += chapter_text + '\n\n'
+            else:
+                print(f"Failed to fetch chapter {i+1}. Skipping...")
         return {'title': title, 'text': novel_text}
     except Exception as e:
         print(f"Error fetching novel: {str(e)}")
