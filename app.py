@@ -8,7 +8,7 @@ import random
 app = Flask(__name__)
 
 def get_random_delay():
-    return random.uniform(1, 3)
+    return random.uniform(2, 4)
 
 def get_random_user_agent():
     windows_versions = ["10.0"]
