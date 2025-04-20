@@ -74,6 +74,7 @@ def get_novel_txt(nid):
         response = scraper.get(novel_url, headers=headers, cookies={'over18': 'off'})
         soup = BeautifulSoup(response.text, "html.parser")
         title = soup.find('div', class_='ss').find('span', attrs={'itemprop': 'name'}).text
+        author = soup.find('div', class_='ss').find('span', attrs={'itemprop': 'author'}).text
         chapter_count = len(soup.select('a[href^="./"]'))
         txt_data = [None] * chapter_count
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
@@ -86,7 +87,7 @@ def get_novel_txt(nid):
                 except Exception as exc:
                     print(f'Chapter {chapter_num} generated an exception: {exc}')
         novel_text = '\n\n'.join(filter(None, txt_data))
-        return {'title': title, 'text': novel_text}
+        return {'title': title, 'author': author, 'text': novel_text}
     except Exception as e:
         print(f"Error fetching novel: {str(e)}")
         return None
