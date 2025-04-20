@@ -34,6 +34,7 @@ def get_chapter_text(scraper, url, headers, nid, wasuu, retry_count=3):
     for _ in range(retry_count):
         try:
             time.sleep(get_random_delay())
+            chapter = {'index': wasuu}
             response = scraper.get(url, headers=headers, cookies={'ETURAN': f'{nid}_{wasuu}', 'over18': 'off'})
             soup = BeautifulSoup(response.text, "html.parser")
             chapter_title_tags = soup.find(id='maind')
@@ -45,13 +46,11 @@ def get_chapter_text(scraper, url, headers, nid, wasuu, retry_count=3):
             for tag in ['ruby', 'rb', 'rt', 'rp']:
                 chapter_title_text = chapter_title_text.replace(f'<{tag}>', '').replace(f'</{tag}>', '')
             result = [str(part).strip() for part in chapter_title_text.split('<br/>') if part.strip()]
-            chapter_title = (
-                f'# {result[0]}\n## {result[1]}\n\n' if len(result) == 2 else
-                f'## {result[0]}\n\n' if len(result) == 1 else
-                ''
-            )
-            chapter_text = '\n'.join(p.text for p in soup.find(id='honbun').find_all('p'))
-            return chapter_title + chapter_text
+            if len(result) == 2:
+                chapter["chap_title"] = result[0]
+            chapter["title"] = result[1]
+            chapter["content"] = '\n'.join(p.text for p in soup.find(id='honbun').find_all('p'))
+            return chapter
         except Exception as e:
             print(f"Error fetching {url}: {str(e)}. Retrying...")
             time.sleep(get_random_delay())
@@ -76,18 +75,16 @@ def get_novel_txt(nid):
         title = soup.find('div', class_='ss').find('span', attrs={'itemprop': 'name'}).text
         author = soup.find('div', class_='ss').find('span', attrs={'itemprop': 'author'}).text
         chapter_count = len(soup.select('a[href^="./"]'))
-        txt_data = [None] * chapter_count
+        chapters = [None] * len(soup.select('a[href^="./"]'))
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             future_to_url = {executor.submit(get_chapter_text, scraper, f'{novel_url}{i+1}.html', headers, nid, i+1): i for i in range(chapter_count)}
             for future in concurrent.futures.as_completed(future_to_url):
                 chapter_num = future_to_url[future]
                 try:
-                    chapter_text = future.result()
-                    txt_data[chapter_num] = chapter_text
+                    chapters[chapter_num] = future.result()
                 except Exception as exc:
                     print(f'Chapter {chapter_num} generated an exception: {exc}')
-        novel_text = '\n\n'.join(filter(None, txt_data))
-        return {'title': title, 'author': author, 'text': novel_text}
+        return {'':'','title': title, 'author': author, 'chapters': chapters}
     except Exception as e:
         print(f"Error fetching novel: {str(e)}")
         return None
