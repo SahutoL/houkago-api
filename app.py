@@ -43,8 +43,6 @@ def get_chapter_text(scraper, url, headers, nid, wasuu, retry_count=3):
             else:
                 chapter_title_tag = chapter_title_tags.find_all('span')[1]
             chapter_title_text = chapter_title_tag.decode_contents()
-            for tag in ['ruby', 'rb', 'rt', 'rp']:
-                chapter_title_text = chapter_title_text.replace(f'<{tag}>', '').replace(f'</{tag}>', '')
             result = [str(part).strip() for part in chapter_title_text.split('<br/>') if part.strip()]
             if len(result) == 2:
                 chapter["chap_title"] = result[0]
@@ -75,7 +73,7 @@ def get_novel_txt(nid):
         title = soup.find('div', class_='ss').find('span', attrs={'itemprop': 'name'}).text
         author = soup.find('div', class_='ss').find('span', attrs={'itemprop': 'author'}).text
         chapter_count = len(soup.select('a[href^="./"]'))
-        chapters = [None] * len(soup.select('a[href^="./"]'))
+        chapters = [None] * chapter_count
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             future_to_url = {executor.submit(get_chapter_text, scraper, f'{novel_url}{i+1}.html', headers, nid, i+1): i for i in range(chapter_count)}
             for future in concurrent.futures.as_completed(future_to_url):
@@ -84,7 +82,7 @@ def get_novel_txt(nid):
                     chapters[chapter_num] = future.result()
                 except Exception as exc:
                     print(f'Chapter {chapter_num} generated an exception: {exc}')
-        return {'':'','title': title, 'author': author, 'chapters': chapters}
+        return {'title': title, 'author': author, 'chapters': chapters}
     except Exception as e:
         print(f"Error fetching novel: {str(e)}")
         return None
@@ -93,7 +91,7 @@ def get_novel_txt(nid):
 def get_novel(nid):
     novel_data = get_novel_txt(nid)
     if novel_data:
-        return jsonify(novel_data)
+        return novel_data
     return jsonify({'error': 'Failed to fetch novel'}), 500
 
 if __name__ == '__main__':
