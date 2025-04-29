@@ -102,6 +102,7 @@ def get_novel_txt(nid):
                     chapters[chapter_num] = {"error": f"チャプター{chapter_num + 1}の取得に失敗しました"}
         
         result = OrderedDict([
+            ('id', int(nid)),
             ('title', title),
             ('author', author),
             ('contents', chapters)
