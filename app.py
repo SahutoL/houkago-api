@@ -1,12 +1,12 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
+import cloudscraper
 from bs4 import BeautifulSoup
 import concurrent.futures
+import json, os, random, string, time
 from collections import OrderedDict
-import cloudscraper
-import os, random, string, time
-
 
 app = Flask(__name__)
+app.config['JSON_AS_ASCII'] = False
 scraper = cloudscraper.create_scraper()
 
 def get_random_delay():
@@ -31,11 +31,21 @@ def get_random_referer():
     ]
     return random.choice(referers)
 
-def get_chapter_text(scraper, url, headers, nid, wasuu, uaid, retry_count=3):
+def get_chapter_text(scraper, url, headers, nid, wasuu, retry_count=3):
     for attempt in range(retry_count):
         try:
             time.sleep(get_random_delay())
             chapter = {'index': wasuu}
+            uaid = 'hX1IoWgQQqc79xeVw' + ''.join(random.choices(string.ascii_letters + string.digits, k=3)) + 'Ag=='
+            headers = {
+                "User-Agent": get_random_user_agent(),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "ja-JP,ja;q=0.9",
+                "Referer": 'https://syosetu.org/novel/{nid}/',
+                "DNT": "1",
+                "Upgrade-Insecure-Requests": "1",
+                "Connection": "keep-alive"
+            }
             response = scraper.get(url, headers=headers, cookies={'ETURAN': f'{nid}_{wasuu}', 'over18': 'off', 'uaid': uaid})
             soup = BeautifulSoup(response.text, "html.parser")
             chapter_title_tags = soup.find('div', id='maind').find_all('span')[1]
@@ -80,7 +90,7 @@ def get_novel_txt(nid):
         max_workers = min(os.cpu_count() or 1, 3)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_url = {
-                executor.submit(get_chapter_text, scraper, f'{novel_url}{i+1}.html', headers, nid, i+1, uaid): i 
+                executor.submit(get_chapter_text, scraper, f'{novel_url}{i+1}.html', headers, nid, i+1): i 
                 for i in range(chapter_count)
             }
             for future in concurrent.futures.as_completed(future_to_url):
@@ -91,7 +101,6 @@ def get_novel_txt(nid):
                     print(f'チャプター {chapter_num} でエラーが発生しました: {exc}')
                     chapters[chapter_num] = {"error": f"チャプター{chapter_num + 1}の取得に失敗しました"}
         
-        # OrderedDictを使用して項目の順序を制御
         result = OrderedDict([
             ('title', title),
             ('author', author),
@@ -106,11 +115,13 @@ def get_novel_txt(nid):
 def get_novel(nid):
     novel_data = get_novel_txt(nid)
     if novel_data and "error" not in novel_data:
-        response = jsonify(novel_data)
-        response.headers['Content-Type'] = 'application/json; charset=utf-8'
-        return response
+        response_data = json.dumps(novel_data, ensure_ascii=False, indent=2)
+        return Response(
+            response_data,
+            mimetype='application/json; charset=utf-8',
+            headers={'Content-Type': 'application/json; charset=utf-8'}
+        )
     return jsonify({'error': '小説の取得に失敗しました'}), 500
 
 if __name__ == '__main__':
     app.run(debug=False)
-
