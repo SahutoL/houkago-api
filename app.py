@@ -1,11 +1,10 @@
 from flask import Flask, jsonify, request
-import cloudscraper
 from bs4 import BeautifulSoup
 import concurrent.futures
-import time
-import random
-import string
-import os
+from collections import OrderedDict
+import cloudscraper
+import os, random, string, time
+
 
 app = Flask(__name__)
 scraper = cloudscraper.create_scraper()
@@ -92,7 +91,13 @@ def get_novel_txt(nid):
                     print(f'チャプター {chapter_num} でエラーが発生しました: {exc}')
                     chapters[chapter_num] = {"error": f"チャプター{chapter_num + 1}の取得に失敗しました"}
         
-        return {'title': title, 'author': author, 'chapters': chapters}
+        # OrderedDictを使用して項目の順序を制御
+        result = OrderedDict([
+            ('title', title),
+            ('author', author),
+            ('contents', chapters)
+        ])
+        return result
     except Exception as e:
         print(f"小説の取得中にエラーが発生しました: {str(e)}")
         return {"error": "小説の取得に失敗しました"}
@@ -101,8 +106,11 @@ def get_novel_txt(nid):
 def get_novel(nid):
     novel_data = get_novel_txt(nid)
     if novel_data and "error" not in novel_data:
-        return jsonify(novel_data)
+        response = jsonify(novel_data)
+        response.headers['Content-Type'] = 'application/json; charset=utf-8'
+        return response
     return jsonify({'error': '小説の取得に失敗しました'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
+
