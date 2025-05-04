@@ -149,21 +149,6 @@ def parse_novel(novel):
         ('keywords', keywords),
         ('favs', favs)
     ])
-    return {
-        'title': title,
-        'link': link,
-        'author': author,
-        'parody': parody,
-        'description': description,
-        'status': status,
-        'latest': latest,
-        'updated_day': f'{updated_day[:10]} {updated_day[10:]}',
-        'words': words,
-        'evaluation': evaluation,
-        'alert_keywords': alert_keywords,
-        'keywords': keywords,
-        'favs': favs
-    }
 
 def search_result(search_url, scraper):
     headers = {
@@ -175,7 +160,6 @@ def search_result(search_url, scraper):
         "Upgrade-Insecure-Requests": "1",
     }
     try:
-        time.sleep(get_random_delay())
         uaid = 'hX1IoWgQQqc79xeVw' + ''.join(random.choices(string.ascii_letters + string.digits, k=3)) + 'Ag=='
         response = scraper.get(search_url, headers=headers, cookies={'over18': 'off', 'uaid': uaid, 'list_num':'50'})
         soup = BeautifulSoup(response.text, "html.parser")
@@ -238,6 +222,50 @@ def search_novel():
     
     try:
         return search_result(search_url, scraper)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/about/<nid>', methods=['GET'])
+def get_about(nid):
+    search_url = f"https://syosetu.org/novel/{nid}/"
+    headers = {
+        "User-Agent": get_random_user_agent(),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "ja-JP,ja;q=0.9",
+        "Referer": get_random_referer(),
+        "DNT": "1",
+        "Upgrade-Insecure-Requests": "1",
+    }
+    try:
+        uaid = 'hX1IoWgQQqc79xeVw' + ''.join(random.choices(string.ascii_letters + string.digits, k=3)) + 'Ag=='
+        response = scraper.get(search_url, headers=headers, cookies={'over18': 'off', 'uaid': uaid})
+        soup = BeautifulSoup(response.text, "html.parser")
+        chapters_table = soup.find_all('div', class_='ss')[2].find('table')
+        chapters_table_rows = chapters_table.find_all('tr')
+        chapters = dict()
+        chapters_list = []
+        current_chapter = "dasqan-8myfpa-nytdUw"
+        
+        for row in chapters_table_rows:
+            if len(row.find_all('td')) == 1:
+                current_chapter = row.find('td').text
+                chapters[current_chapter] = []
+                chapters_list.append(current_chapter)
+            if len(row.find_all('td')) == 2:
+                if current_chapter not in chapters:
+                    chapters[current_chapter] = []
+                    chapters_list.append(current_chapter)
+                chapters[current_chapter].append(row.find_all('td')[0].text.replace('\u3000', '')[1:])
+        
+        result = OrderedDict([
+            (chapter, chapters[chapter]) for chapter in chapters_list
+        ])
+        response_data = json.dumps(result, ensure_ascii=False, indent=2)
+        return Response(
+            response_data,
+            mimetype='application/json; charset=utf-8',
+            headers={'Content-Type': 'application/json; charset=utf-8'}
+        )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
