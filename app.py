@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 import concurrent.futures
 import json, os, random, string, time
 from collections import OrderedDict
-
+from urllib.parse import urlencode
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 scraper = cloudscraper.create_scraper()
@@ -112,6 +112,88 @@ def get_novel_txt(nid):
         print(f"小説の取得中にエラーが発生しました: {str(e)}")
         return {"error": "小説の取得に失敗しました"}
 
+
+def parse_novel(novel):
+    title = novel.find('a').text
+    link = novel.find('a').get('href')
+    author_info = novel.find_all('div', class_='blo_title_sak')[-1].text.split('\n')
+    author = author_info[2][2:]
+    parody = author_info[1].replace('原作：','')
+    if 'オリジナル：' in parody:
+        parody = ['オリジナル', parody.replace('オリジナル：','')]
+    else:
+        parody = ['原作', parody]
+    description = novel.find('div', class_='blo_inword').text
+    status = novel.find('div', class_='blo_wasuu_base').find('span').text
+    latest = novel.find('a', attrs={'title':'最新話へのリンク'}).text
+    updated_day = novel.find('div', attrs={'title':'最終更新日'}).text
+    words = novel.find('div', attrs={'title': '総文字数'}).text.split(' ')[1]
+    evaluation = novel.find('div', class_='blo_hyouka').text.strip()[5:]
+    all_keywords = novel.find('div', class_='all_keyword').find_all('a')
+    alert_keywords = [x.text for x in novel.find('div', class_='all_keyword').find('span').find_all('a')]
+    keywords = [x.text for x in all_keywords if x.text not in alert_keywords]
+    favs = novel.find_all('div', attrs={'style': 'background-color: transparent;'})[-1].text.split('｜')[1][6:]
+    
+    return OrderedDict([
+        ('title', title),
+        ('link', link),
+        ('author', author),
+        ('parody', parody),
+        ('description', description),
+        ('status', status),
+        ('latest', latest),
+        ('updated_day', f'{updated_day[:10]} {updated_day[10:]}'),
+        ('words', words),
+        ('evaluation', evaluation),
+        ('alert_keywords', alert_keywords),
+        ('keywords', keywords),
+        ('favs', favs)
+    ])
+    return {
+        'title': title,
+        'link': link,
+        'author': author,
+        'parody': parody,
+        'description': description,
+        'status': status,
+        'latest': latest,
+        'updated_day': f'{updated_day[:10]} {updated_day[10:]}',
+        'words': words,
+        'evaluation': evaluation,
+        'alert_keywords': alert_keywords,
+        'keywords': keywords,
+        'favs': favs
+    }
+
+def search_result(search_url, scraper):
+    headers = {
+        "User-Agent": get_random_user_agent(),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "ja-JP,ja;q=0.9",
+        "Referer": get_random_referer(),
+        "DNT": "1",
+        "Upgrade-Insecure-Requests": "1",
+    }
+    try:
+        time.sleep(get_random_delay())
+        uaid = 'hX1IoWgQQqc79xeVw' + ''.join(random.choices(string.ascii_letters + string.digits, k=3)) + 'Ag=='
+        response = scraper.get(search_url, headers=headers, cookies={'over18': 'off', 'uaid': uaid, 'list_num':'50'})
+        soup = BeautifulSoup(response.text, "html.parser")
+        novels = soup.find_all('div', class_='section3')
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_to_index = {executor.submit(parse_novel, novel): i for i, novel in enumerate(novels)}
+            results = [None] * len(novels)
+                
+            for future in concurrent.futures.as_completed(future_to_index):
+                index = future_to_index[future]
+                results[index] = future.result()
+            
+        return {'results': results}
+
+    except Exception as e:
+        return {'error': str(e)}
+
+            
 @app.route('/api/novel/<nid>', methods=['GET'])
 def get_novel(nid):
     novel_data = get_novel_txt(nid)
@@ -122,6 +204,37 @@ def get_novel(nid):
             mimetype='application/json; charset=utf-8',
             headers={'Content-Type': 'application/json; charset=utf-8'}
         )
+    return jsonify({'error': '小説の取得に失敗しました'}), 500
+
+@app.route('/api/search', methods=['GET'])
+def search_novel():
+    search_mode = request.form.get('mode', 'search')
+    word = request.form.get('word', '')
+    parody = request.form.get('parody', '')
+    type_value = request.form.get('type', '0')
+
+    filter_params = ['rensai_s1', 'rensai_s2', 'rensai_s4', 'mozi2', 'mozi1', 'mozi2_all', 'mozi1_all', 'rate2', 'rate1', 
+                     'soupt2', 'soupt1', 'f2', 'f1', 're2', 're1', 'v2', 'v1', 
+                     'r2', 'r1', 't2', 't1', 'd2', 'd1']
+
+    url_params = {
+        'mode': search_mode,
+        'word': word,
+        'gensaku': parody,
+        'type': type_value
+    }
+
+    for param in filter_params:
+        value = request.form.get(param)
+        if value:
+            url_params[param] = value
+
+    search_url = f"https://syosetu.org/search/?{urlencode(url_params)}"
+        
+    result = search_result(search_url, scraper)
+    if result and "error" not in result:
+        return jsonify(result)
+    
     return jsonify({'error': '小説の取得に失敗しました'}), 500
 
 if __name__ == '__main__':
