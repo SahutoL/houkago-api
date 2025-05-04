@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request, Response
 import cloudscraper
 from bs4 import BeautifulSoup
 import concurrent.futures
-import json, os, random, string, time
+import json, os, random, string, time, re
 from collections import OrderedDict
 from urllib.parse import urlencode
 app = Flask(__name__)
@@ -116,6 +116,7 @@ def get_novel_txt(nid):
 def parse_novel(novel):
     title = novel.find('a').text
     link = novel.find('a').get('href')
+    nid = re.search(r'//syosetu.org/novel/(\d+)/', link).group(1)
     author_info = novel.find_all('div', class_='blo_title_sak')[-1].text.split('\n')
     author = author_info[2][2:]
     parody = author_info[1].replace('原作：','')
@@ -135,6 +136,7 @@ def parse_novel(novel):
     favs = novel.find_all('div', attrs={'style': 'background-color: transparent;'})[-1].text.split('｜')[1][6:]
     
     return OrderedDict([
+        ('nid', nid),
         ('title', title),
         ('link', link),
         ('author', author),
