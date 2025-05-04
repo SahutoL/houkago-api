@@ -197,7 +197,7 @@ def get_novel(nid):
         )
     return jsonify({'error': '小説の取得に失敗しました'}), 500
 
-@app.route('/api/search', methods=['GET'])
+@app.route('/api/search', methods=['POST'])
 def search_novel():
     search_mode = request.form.get('mode', 'search')
     word = request.form.get('word', '')
