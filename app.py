@@ -187,8 +187,13 @@ def search_result(search_url, scraper):
             for future in concurrent.futures.as_completed(future_to_index):
                 index = future_to_index[future]
                 results[index] = future.result()
-            
-        return {'results': results}
+        
+        result_data = json.dumps(results, ensure_ascii=False, indent=2)
+        return Response(
+            result_data,
+            mimetype='application/json; charset=utf-8',
+            headers={'Content-Type': 'application/json; charset=utf-8'}
+        )
 
     except Exception as e:
         return {'error': str(e)}
@@ -230,12 +235,11 @@ def search_novel():
             url_params[param] = value
 
     search_url = f"https://syosetu.org/search/?{urlencode(url_params)}"
-        
-    result = search_result(search_url, scraper)
-    if result and "error" not in result:
-        return jsonify(result)
     
-    return jsonify({'error': '小説の取得に失敗しました'}), 500
+    try:
+        return search_result(search_url, scraper)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=False)
