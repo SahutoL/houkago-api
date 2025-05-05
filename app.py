@@ -318,7 +318,7 @@ def get_chapter(nid, index):
             chapter["title"] = result[1]
         elif len(result) == 1:
             chapter["title"] = result[0]
-            chapter["content"] = '\n'.join(p.text for p in soup.find(id='honbun').find_all('p'))
+        chapter["content"] = '\n'.join(p.text for p in soup.find(id='honbun').find_all('p'))
         response_data = json.dumps(chapter, ensure_ascii=False, indent=2)
         return Response(
             response_data,
