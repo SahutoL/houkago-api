@@ -334,7 +334,7 @@ def get_ranking(mode):
             link = novel.find('div', class_='blo_title_base').find('a').get('href')
             nid = re.search(r'//syosetu.org/novel/(\d+)/', link).group(1)
             author_info = novel.find('div', class_='blo_title_sak').text
-            author = author_info[2:]
+            author = author_info[2:].replace('\n','')
             parody = novel.find('div', class_='blo_genre').text[1:-1].replace('原作：','')
             if 'オリジナル：' in parody:
                 parody = ['オリジナル', parody.replace('オリジナル：','')]
