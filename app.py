@@ -5,9 +5,20 @@ import concurrent.futures
 import json, os, random, string, time, re
 from collections import OrderedDict
 from urllib.parse import urlencode
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 scraper = cloudscraper.create_scraper()
+
+# リクエスト制限の設定
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["5 per minute", "100 per hour"],
+    storage_uri="memory://",
+)
 
 def get_random_delay():
     return random.uniform(3, 5)
@@ -186,6 +197,7 @@ def search_result(search_url, scraper):
 
             
 @app.route('/api/novel/<nid>', methods=['GET'])
+@limiter.limit("3 per minute")
 def get_novel(nid):
     novel_data = get_novel_txt(nid)
     if novel_data and "error" not in novel_data:
@@ -198,6 +210,7 @@ def get_novel(nid):
     return jsonify({'error': '小説の取得に失敗しました'}), 500
 
 @app.route('/api/search', methods=['POST'])
+@limiter.limit("5 per minute")
 def search_novel():
     search_mode = request.form.get('mode', 'search')
     word = request.form.get('word', '')
@@ -229,6 +242,7 @@ def search_novel():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/about/<nid>', methods=['GET'])
+@limiter.limit("10 per minute")
 def get_about(nid):
     search_url = f"https://syosetu.org/novel/{nid}/"
     headers = {
@@ -277,6 +291,7 @@ def get_about(nid):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/novel/<nid>/<index>', methods=['GET'])
+@limiter.limit("10 per minute")
 def get_chapter(nid, index):
     search_url = f"https://syosetu.org/novel/{nid}/{index}.html"
     headers = {
@@ -311,6 +326,7 @@ def get_chapter(nid, index):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/ranking/<mode>', methods=['GET'])
+@limiter.limit("5 per minute")
 def get_ranking(mode):
     search_url = f"https://syosetu.org/?mode={mode}"
     headers = {
@@ -326,13 +342,15 @@ def get_ranking(mode):
         response = scraper.get(search_url, headers=headers, cookies={'over18': 'off', 'uaid': uaid})
         soup = BeautifulSoup(response.text, "html.parser")
         ranking_list = soup.find_all('div', class_='section3')
+        print(ranking_list)
         result = []
         for novel in ranking_list:
             title = novel.find('div', class_='blo_title_base').find('a').text
+            print(title)
             link = novel.find('div', class_='blo_title_base').find('a').get('href')
             nid = re.search(r'//syosetu.org/novel/(\d+)/', link).group(1)
             author_info = novel.find('div', class_='blo_title_sak').text
-            author = author_info[2:].replace('\n','')
+            author = author_info[2:]
             parody = novel.find('div', class_='blo_genre').text[1:-1].replace('原作：','')
             if 'オリジナル：' in parody:
                 parody = ['オリジナル', parody.replace('オリジナル：','')]
