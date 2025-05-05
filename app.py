@@ -326,11 +326,9 @@ def get_ranking(mode):
         response = scraper.get(search_url, headers=headers, cookies={'over18': 'off', 'uaid': uaid})
         soup = BeautifulSoup(response.text, "html.parser")
         ranking_list = soup.find_all('div', class_='section3')
-        print(ranking_list)
         result = []
         for novel in ranking_list:
             title = novel.find('div', class_='blo_title_base').find('a').text
-            print(title)
             link = novel.find('div', class_='blo_title_base').find('a').get('href')
             nid = re.search(r'//syosetu.org/novel/(\d+)/', link).group(1)
             author_info = novel.find('div', class_='blo_title_sak').text
