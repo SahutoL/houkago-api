@@ -257,7 +257,12 @@ def get_about(nid):
         uaid = 'hX1IoWgQQqc79xeVw' + ''.join(random.choices(string.ascii_letters + string.digits, k=3)) + 'Ag=='
         response = scraper.get(search_url, headers=headers, cookies={'over18': 'off', 'uaid': uaid})
         soup = BeautifulSoup(response.text, "html.parser")
-        description = soup.find_all('div', class_='ss')[1].text
+        
+        description_div = soup.find_all('div', class_='ss')[1]
+        for br in description_div.find_all('br'):
+            br.replace_with('\n')
+        description = description_div.text.strip()
+        
         chapters_table = soup.find_all('div', class_='ss')[2].find('table')
         chapters_table_rows = chapters_table.find_all('tr')
         chapters = dict()
