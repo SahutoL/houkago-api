@@ -279,5 +279,34 @@ def get_about(nid):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/novel/<nid>/<index>', methods=['GET'])
+def get_chapter(nid, index):
+    search_url = f"https://syosetu.org/novel/{nid}/{index}.html"
+    headers = {
+        "User-Agent": get_random_user_agent(),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "ja-JP,ja;q=0.9",
+        "Referer": get_random_referer(),
+        "DNT": "1",
+        "Upgrade-Insecure-Requests": "1",
+    }
+    try:
+        uaid = 'hX1IoWgQQqc79xeVw' + ''.join(random.choices(string.ascii_letters + string.digits, k=3)) + 'Ag=='
+        response = scraper.get(search_url, headers=headers, cookies={'ETURAN': f'{nid}_{index}', 'over18': 'off', 'uaid': uaid})
+        soup = BeautifulSoup(response.text, "html.parser")
+        chapter = {}
+        chapter_title_tags = soup.find('div', id='maind').find_all('span')[1]
+        chapter_title_text = chapter_title_tags.decode_contents().replace('<br/>', '\n')
+        result = [line.strip() for line in chapter_title_text.split('\n') if line.strip()]
+        if len(result) == 2:
+            chapter["chap_title"] = result[0]
+            chapter["title"] = result[1]
+        elif len(result) == 1:
+            chapter["title"] = result[0]
+            chapter["content"] = '\n'.join(p.text for p in soup.find(id='honbun').find_all('p'))
+        return chapter
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=False)
