@@ -199,7 +199,6 @@ def get_novel(nid):
 
 @app.route('/api/search', methods=['POST'])
 def search_novel():
-    print(request.form)
     search_mode = request.form.get('mode', 'search')
     word = request.form.get('word', '')
     parody = request.form.get('parody', '')
@@ -218,13 +217,11 @@ def search_novel():
 
     for param in filter_params:
         value = request.form.get(param)
-        print(param, value)
         
         if value:
             url_params[param] = value
 
     search_url = f"https://syosetu.org/search/?{urlencode(url_params)}"
-    print(search_url)
     
     try:
         return search_result(search_url, scraper)
@@ -312,6 +309,73 @@ def get_chapter(nid, index):
         )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ranking/<mode>', methods=['GET'])
+def get_ranking(mode):
+    search_url = f"https://syosetu.org/?mode={mode}"
+    headers = {
+        "User-Agent": get_random_user_agent(),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "ja-JP,ja;q=0.9",
+        "Referer": get_random_referer(),
+        "DNT": "1",
+        "Upgrade-Insecure-Requests": "1",
+    }
+    try:
+        uaid = 'hX1IoWgQQqc79xeVw' + ''.join(random.choices(string.ascii_letters + string.digits, k=3)) + 'Ag=='
+        response = scraper.get(search_url, headers=headers, cookies={'over18': 'off', 'uaid': uaid})
+        soup = BeautifulSoup(response.text, "html.parser")
+        ranking_list = soup.find_all('div', class_='section3')
+        print(ranking_list)
+        result = []
+        for novel in ranking_list:
+            title = novel.find('div', class_='blo_title_base').find('a').text
+            print(title)
+            link = novel.find('div', class_='blo_title_base').find('a').get('href')
+            nid = re.search(r'//syosetu.org/novel/(\d+)/', link).group(1)
+            author_info = novel.find('div', class_='blo_title_sak').text
+            author = author_info[2:]
+            parody = novel.find('div', class_='blo_genre').text[1:-1].replace('原作：','')
+            if 'オリジナル：' in parody:
+                parody = ['オリジナル', parody.replace('オリジナル：','')]
+            else:
+                parody = ['原作', parody]
+            description = novel.find('div', class_='blo_inword').text
+            status = novel.find('div', class_='blo_wasuu_base').find('span').text
+            latest = novel.find('a', attrs={'title':'最新話へのリンク'}).text
+            updated_day = novel.find('div', attrs={'title':'最終更新日'}).text
+            words = novel.find('div', attrs={'title': '総文字数'}).text.split(' ')[0]
+            evaluation = novel.find('div', class_='blo_hyouka').text[5:]
+            all_keywords = novel.find('div', class_='all_keyword').find_all('a')
+            alert_keywords = [x.text for x in novel.find('div', class_='all_keyword').find('span').find_all('a')]
+            keywords = [x.text for x in all_keywords if x.text not in alert_keywords]
+            favs = novel.find_all('div', attrs={'style': 'background-color: transparent;'})[-1].text.split('｜')[1][6:]
+    
+            result.append(OrderedDict([
+                ('nid', nid),
+                ('title', title),
+                ('link', link),
+                ('author', author),
+                ('parody', parody),
+                ('description', description),
+                ('status', status),
+                ('latest', latest),
+                ('updated_day', f'{updated_day[:10]} {updated_day[10:]}'),
+                ('words', words),
+                ('evaluation', evaluation),
+                ('alert_keywords', alert_keywords),
+                ('keywords', keywords),
+                ('favs', favs)
+            ]))
+        response_data = json.dumps(result, ensure_ascii=False, indent=2)
+        return Response(
+            response_data,
+            mimetype='application/json; charset=utf-8',
+            headers={'Content-Type': 'application/json; charset=utf-8'}
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
 
 if __name__ == '__main__':
     app.run(debug=False)
