@@ -278,9 +278,7 @@ def get_about(nid):
         result = [OrderedDict([
             (chapter, chapters[chapter]) for chapter in chapters_list
         ])]
-        result.append(OrderedDict([
-            ('description', description)
-        ]))
+        result.append({'description': description})
         response_data = json.dumps(result, ensure_ascii=False, indent=2)
         return Response(
             response_data,
