@@ -304,7 +304,12 @@ def get_chapter(nid, index):
         elif len(result) == 1:
             chapter["title"] = result[0]
             chapter["content"] = '\n'.join(p.text for p in soup.find(id='honbun').find_all('p'))
-        return chapter
+        response_data = json.dumps(chapter, ensure_ascii=False, indent=2)
+        return Response(
+            response_data,
+            mimetype='application/json; charset=utf-8',
+            headers={'Content-Type': 'application/json; charset=utf-8'}
+        )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
