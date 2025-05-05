@@ -16,7 +16,7 @@ scraper = cloudscraper.create_scraper()
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["5 per minute", "100 per hour"],
+    default_limits=["10 per minute", "150 per hour"],
     storage_uri="memory://",
 )
 
