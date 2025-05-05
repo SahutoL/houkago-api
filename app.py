@@ -199,6 +199,7 @@ def get_novel(nid):
 
 @app.route('/api/search', methods=['POST'])
 def search_novel():
+    print(request.form)
     search_mode = request.form.get('mode', 'search')
     word = request.form.get('word', '')
     parody = request.form.get('parody', '')
@@ -217,10 +218,13 @@ def search_novel():
 
     for param in filter_params:
         value = request.form.get(param)
+        print(param, value)
+        
         if value:
             url_params[param] = value
 
     search_url = f"https://syosetu.org/search/?{urlencode(url_params)}"
+    print(search_url)
     
     try:
         return search_result(search_url, scraper)
@@ -242,6 +246,7 @@ def get_about(nid):
         uaid = 'hX1IoWgQQqc79xeVw' + ''.join(random.choices(string.ascii_letters + string.digits, k=3)) + 'Ag=='
         response = scraper.get(search_url, headers=headers, cookies={'over18': 'off', 'uaid': uaid})
         soup = BeautifulSoup(response.text, "html.parser")
+        description = soup.find_all('div', class_='ss')[1].text
         chapters_table = soup.find_all('div', class_='ss')[2].find('table')
         chapters_table_rows = chapters_table.find_all('tr')
         chapters = dict()
@@ -259,9 +264,12 @@ def get_about(nid):
                     chapters_list.append(current_chapter)
                 chapters[current_chapter].append(row.find_all('td')[0].text.replace('\u3000', '')[1:])
         
-        result = OrderedDict([
+        result = [OrderedDict([
             (chapter, chapters[chapter]) for chapter in chapters_list
-        ])
+        ])]
+        result.append(OrderedDict([
+            ('description', description)
+        ]))
         response_data = json.dumps(result, ensure_ascii=False, indent=2)
         return Response(
             response_data,
