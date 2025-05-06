@@ -16,7 +16,7 @@ scraper = cloudscraper.create_scraper()
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["20 per minute", "200 per hour"],
+    default_limits=["50 per minute", "300 per hour"],
     storage_uri="memory://",
 )
 
@@ -242,7 +242,7 @@ def search_novel():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/about/<nid>', methods=['GET'])
-@limiter.limit("10 per minute")
+@limiter.limit("30 per minute")
 def get_about(nid):
     search_url = f"https://syosetu.org/novel/{nid}/"
     headers = {
@@ -294,7 +294,7 @@ def get_about(nid):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/novel/<nid>/<index>', methods=['GET'])
-@limiter.limit("10 per minute")
+@limiter.limit("60 per minute")
 def get_chapter(nid, index):
     search_url = f"https://syosetu.org/novel/{nid}/{index}.html"
     headers = {
@@ -329,7 +329,7 @@ def get_chapter(nid, index):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/ranking/<mode>', methods=['GET'])
-@limiter.limit("5 per minute")
+@limiter.limit("20 per minute")
 def get_ranking(mode):
     search_url = f"https://syosetu.org/?mode={mode}"
     headers = {
